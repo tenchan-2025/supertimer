@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多機能タイマー</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル */
+        .tab-content {
+            display: none;
+        }
+        .active-tab {
+            display: block;
+        }
+        .time-select::-webkit-outer-spin-button,
+        .time-select::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .time-select {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        .time-unit {
+            font-size: 0.8rem;
+            color: #4b5563;
+        }
+        /* マイナスカウント専用の赤字スタイル */
+        .overtime {
+            /* カウントダウンでの時間超過時、またはカウントアップでの目標超過時 */
+            color: #ef4444; /* red-500 */
+        }
+        .text-indigo-700 { color: #4338ca; } /* カウントダウン通常色 */
+        .text-blue-700 { color: #1d4ed8; } /* カウントアップ通常色 */
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex items-center justify-center p-4">
+
+    <div id="app" class="bg-white shadow-2xl rounded-xl w-full max-w-lg overflow-hidden">
+        <header class="p-4 bg-indigo-600 text-white">
+            <h1 class="text-2xl font-bold text-center">多機能タイマー</h1>
+        </header>
+
+        <!-- タブナビゲーション -->
+        <nav class="flex border-b border-gray-200">
+            <button class="tab-button flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="normal_timer">通常タイマー</button>
+            <button class="tab-button flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="exam_timer">検定タイマー</button>
+            <button class="tab-button flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="stopwatch">ストップウォッチ</button>
+        </nav>
+
+        <main class="p-6">
+            <!-- 1. 通常タイマー -->
+            <div id="normal_timer" class="tab-content active-tab">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">通常のタイマー (カウントダウン / カウントアップ)</h2>
+                
+                <!-- モード切り替え -->
+                <div class="flex justify-center mb-6 space-x-2">
+                    <button id="countdown_mode_btn" class="px-4 py-2 text-sm font-bold rounded-full transition-colors duration-200 bg-indigo-600 text-white shadow-md">カウントダウン</button>
+                    <button id="countup_mode_btn" class="px-4 py-2 text-sm font-bold rounded-full transition-colors duration-200 bg-gray-200 text-gray-700 hover:bg-gray-300">カウントアップ</button>
+                </div>
+                
+                <!-- 時間設定 (ドロップダウン) -->
+                <div id="normal-timer-controls" class="flex justify-center items-center space-x-2 mb-6 p-4 bg-indigo-50 rounded-lg shadow-inner">
+                    <div class="flex flex-col items-center">
+                        <select id="setHour" class="time-select text-4xl font-mono p-1 border-2 border-indigo-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-20 text-center"></select>
+                        <span class="time-unit">時間</span>
+                    </div>
+                    <span class="text-4xl font-mono">:</span>
+                    <div class="flex flex-col items-center">
+                        <select id="setMin" class="time-select text-4xl font-mono p-1 border-2 border-indigo-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-20 text-center"></select>
+                        <span class="time-unit">分</span>
+                    </div>
+                    <span class="text-4xl font-mono">:</span>
+                    <div class="flex flex-col items-center">
+                        <select id="setSec" class="time-select text-4xl font-mono p-1 border-2 border-indigo-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-20 text-center"></select>
+                        <span class="time-unit">秒</span>
+                    </div>
+                </div>
+
+                <!-- タイマー表示 -->
+                <div id="normalTimerDisplay" class="text-7xl font-extrabold text-center text-indigo-700 mb-6">00:00:00</div>
+                <!-- カウントダウンモードでの超過時間表示、カウントアップモードでは「目標時間: XX:XX:XX」を表示 -->
+                <div id="normalTimerOvertime" class="text-xl font-bold text-center text-red-500 mb-4 h-6"></div> 
+
+                <!-- ボタン -->
+                <div class="flex justify-center space-x-4">
+                    <button id="normalStartBtn" class="px-6 py-3 bg-green-500 text-white font-bold rounded-full shadow-lg hover:bg-green-600 transition duration-200 transform hover:scale-105 active:scale-95">開始</button>
+                    <button id="normalStopBtn" class="px-6 py-3 bg-red-500 text-white font-bold rounded-full shadow-lg hover:bg-red-600 transition duration-200 transform hover:scale-105 active:scale-95" disabled>停止</button>
+                    <button id="normalResetBtn" class="px-6 py-3 bg-gray-500 text-white font-bold rounded-full shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105 active:scale-95">リセット</button>
+                </div>
+            </div>
+
+            <!-- 2. 計算技術検定タイマー -->
+            <div id="exam_timer" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">計算技術検定タイマー (10分 + 1分 3サイクル)</h2>
+                
+                <div id="examTimerDisplay" class="text-7xl font-extrabold text-center text-purple-700 mb-4">00:00</div>
+                <div id="examPhaseDisplay" class="text-2xl font-medium text-center text-purple-600 h-8 mb-6">準備完了</div>
+
+                <!-- ボタン -->
+                <div class="flex justify-center space-x-4">
+                    <button id="examStartBtn" class="px-6 py-3 bg-purple-500 text-white font-bold rounded-full shadow-lg hover:bg-purple-600 transition duration-200 transform hover:scale-105 active:scale-95">開始</button>
+                    <button id="examStopBtn" class="px-6 py-3 bg-red-500 text-white font-bold rounded-full shadow-lg hover:bg-red-600 transition duration-200 transform hover:scale-105 active:scale-95" disabled>停止</button>
+                    <button id="examResetBtn" class="px-6 py-3 bg-gray-500 text-white font-bold rounded-full shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105 active:scale-95">リセット</button>
+                </div>
+                
+                <div id="examInfo" class="mt-6 p-3 text-center text-sm text-gray-600 border-t pt-4">
+                    <p>10分間の試験時間と1分間の休憩を3回繰り返します。</p>
+                    <p>
+                        <strong class="text-purple-600">試験開始時 (10分)：ビープ音2回</strong> / 
+                        <strong class="text-red-600">試験終了時 (10分)：ビープ音5回</strong> / 
+                        休憩時間：<strong class="text-green-600">ビープ音無し</strong>
+                    </p>
+                </div>
+            </div>
+
+            <!-- 3. ストップウォッチ -->
+            <div id="stopwatch" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">ストップウォッチ</h2>
+
+                <div id="stopwatchDisplay" class="text-7xl font-extrabold text-center text-blue-700 mb-6 font-mono">00:00:00.00</div>
+                
+                <!-- ボタン -->
+                <div class="flex justify-center space-x-4 mb-4">
+                    <button id="stopwatchStartBtn" class="px-6 py-3 bg-blue-500 text-white font-bold rounded-full shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105 active:scale-95">開始</button>
+                    <button id="stopwatchStopBtn" class="px-6 py-3 bg-red-500 text-white font-bold rounded-full shadow-lg hover:bg-red-600 transition duration-200 transform hover:scale-105 active:scale-95" disabled>停止</button>
+                    <button id="stopwatchResetBtn" class="px-6 py-3 bg-gray-500 text-white font-bold rounded-full shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105 active:scale-95">リセット</button>
+                </div>
+
+                <!-- ラップタイム表示 -->
+                <div class="text-center">
+                    <button id="stopwatchLapBtn" class="px-4 py-2 bg-yellow-500 text-white font-bold rounded-full shadow hover:bg-yellow-600 transition duration-200 transform hover:scale-105 active:scale-95" disabled>ラップ</button>
+                </div>
+                <div id="lapTimes" class="mt-4 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <p class="text-center text-gray-500 text-sm">ラップタイムはここに表示されます。</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // グローバル変数
+        let audioContext;
+        
+        // --- Web Audio API (ビープ音機能) ---
+        /**
+         * 指定された回数、ビープ音を鳴らします。
+         * @param {number} times - 鳴らす回数
+         * @param {number} duration - 1回あたりの音の長さ (ミリ秒)
+         * @param {number} frequency - 音の周波数 (Hz)
+         * @param {number} delay - 音と音の間の遅延 (ミリ秒)
+         */
+        const createBeep = (times, duration = 150, frequency = 440, delay = 100) => {
+            // AudioContextがまだ作成されていない場合は作成
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            let count = 0;
+            
+            const play = () => {
+                if (count >= times) return;
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                // ゲイン（音量）を0.3に設定
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+                // 発振器の設定
+                oscillator.type = 'square'; // 波形タイプ
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+                // 接続: Oscillator -> Gain -> Destination (スピーカー)
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // 再生開始
+                oscillator.start();
+
+                // 指定時間後に停止
+                setTimeout(() => {
+                    // フェードアウト
+                    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + (duration / 1000) * 0.5);
+                    oscillator.stop(audioContext.currentTime + (duration / 1000) * 0.5);
+                    
+                    count++;
+                    // 次の音を鳴らすためのディレイ
+                    if (count < times) {
+                        setTimeout(play, duration + delay);
+                    }
+                }, duration);
+            };
+
+            play();
+        };
+
+        // --- タブ切り替え機能 ---
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        const switchTab = (tabId) => {
+            // コンテンツの切り替え
+            tabContents.forEach(content => {
+                content.classList.remove('active-tab');
+                if (content.id === tabId) {
+                    content.classList.add('active-tab');
+                }
+            });
+
+            // ボタンのアクティブ状態切り替え
+            tabButtons.forEach(button => {
+                button.classList.remove('border-indigo-600', 'text-indigo-600');
+                button.classList.add('text-gray-500', 'hover:text-indigo-600');
+                if (button.dataset.tab === tabId) {
+                    button.classList.add('border-indigo-600', 'text-indigo-600', 'border-b-2');
+                    button.classList.remove('text-gray-500', 'hover:text-indigo-600');
+                }
+            });
+
+            // タブを切り替える際に全てのタイマーを停止/リセット
+            stopNormalTimer();
+            resetNormalTimer();
+            stopExamTimer();
+            resetExamTimer();
+            stopStopwatch();
+        };
+
+        // 初期タブ設定 (通常タイマー)
+        document.addEventListener('DOMContentLoaded', () => {
+            switchTab('normal_timer');
+        });
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                switchTab(button.dataset.tab);
+            });
+        });
+
+        // --- 1. 通常タイマーロジック ---
+        let normalTimerInterval = null;
+        let remainingSeconds = 0; // カウントダウン時は残り時間, カウントアップ時は経過時間
+        let targetSeconds = 0;    // カウントアップ/ダウン共通の目標時間 (秒)
+        let isTimerAlerted = false; // カウントアップ/ダウン共通で、目標時間に達したかどうかのフラグ
+        let isCountdownMode = true; // カウントダウンモードがデフォルト
+        
+        const setHourSelect = document.getElementById('setHour');
+        const setMinSelect = document.getElementById('setMin');
+        const setSecSelect = document.getElementById('setSec');
+        const normalTimerControls = document.getElementById('normal-timer-controls'); // 時間設定コンテナ
+        const normalTimerDisplay = document.getElementById('normalTimerDisplay');
+        const normalTimerOvertime = document.getElementById('normalTimerOvertime'); // 超過時間/目標時間表示要素
+        const normalStartBtn = document.getElementById('normalStartBtn');
+        const normalStopBtn = document.getElementById('normalStopBtn');
+        const normalResetBtn = document.getElementById('normalResetBtn');
+
+        // 新規: モードボタン
+        const countdownModeBtn = document.getElementById('countdown_mode_btn');
+        const countupModeBtn = document.getElementById('countup_mode_btn');
+
+
+        // セレクトボックスのオプション生成
+        const createOptions = (selectElement, max, initialValue = 0) => {
+            for (let i = 0; i <= max; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = String(i).padStart(2, '0');
+                selectElement.appendChild(option);
+            }
+            selectElement.value = initialValue;
+        };
+
+        createOptions(setHourSelect, 23); // 0-23時間
+        createOptions(setMinSelect, 59);  // 0-59分
+        createOptions(setSecSelect, 59);  // 0-59秒
+
+        // 選択値が変更されたら残り時間/目標時間を更新
+        [setHourSelect, setMinSelect, setSecSelect].forEach(select => {
+            select.addEventListener('change', () => {
+                updateTargetSeconds();
+                // カウントダウンモードの場合は表示時間も更新
+                if (isCountdownMode) {
+                    updateNormalTimeDisplay(remainingSeconds);
+                }
+                updateNormalTimeDisplay(remainingSeconds); // 表示を更新
+                checkInitialNormalStart();
+            });
+        });
+
+        // 目標時間 (targetSeconds) を設定に基づいて更新
+        const updateTargetSeconds = () => {
+            const h = parseInt(setHourSelect.value);
+            const m = parseInt(setMinSelect.value);
+            const s = parseInt(setSecSelect.value);
+            targetSeconds = h * 3600 + m * 60 + s;
+
+            if (isCountdownMode) {
+                 // カウントダウンモードでは残り時間にセット
+                remainingSeconds = targetSeconds; 
+            }
+        };
+        updateTargetSeconds(); // 最初の目標時間設定 (00:00:00)
+
+        const formatTime = (totalSeconds) => {
+            const absSeconds = Math.abs(totalSeconds);
+            const sign = totalSeconds < 0 ? "-" : "";
+            
+            const h = Math.floor(absSeconds / 3600);
+            const m = Math.floor((absSeconds % 3600) / 60);
+            const s = absSeconds % 60;
+            return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+
+        const updateNormalTimeDisplay = (seconds) => {
+            const formattedTarget = formatTime(targetSeconds);
+            
+            // クラスをリセット
+            normalTimerDisplay.classList.remove('overtime', 'text-indigo-700', 'text-blue-700'); 
+
+            if (isCountdownMode) {
+                // カウントダウンモードの表示ロジック
+                if (seconds < 0) {
+                    // 時間超過 (赤字)
+                    normalTimerDisplay.textContent = formatTime(seconds); 
+                    normalTimerDisplay.classList.add('overtime');
+                    normalTimerOvertime.textContent = `【時間超過】${formatTime(seconds).replace('-', '+')}`;
+                } else {
+                    // 通常カウントダウン (青字)
+                    normalTimerDisplay.textContent = formatTime(seconds);
+                    normalTimerDisplay.classList.add('text-indigo-700');
+                    normalTimerOvertime.textContent = ''; 
+                }
+            } else {
+                // カウントアップモードの表示ロジック
+                normalTimerDisplay.textContent = formatTime(seconds);
+                
+                if (targetSeconds > 0) {
+                    if (seconds >= targetSeconds) {
+                        // 目標達成後の超過 (赤字)
+                        normalTimerDisplay.classList.add('overtime');
+                        normalTimerOvertime.textContent = isTimerAlerted ? '【目標達成済み - 超過中】' : `【目標時間: ${formattedTarget}】`;
+                    } else {
+                        // 目標達成前 (青字)
+                        normalTimerDisplay.classList.add('text-blue-700');
+                        normalTimerOvertime.textContent = `【目標時間: ${formattedTarget}】`;
+                    }
+                } else {
+                     // 目標時間設定なし (青字)
+                    normalTimerDisplay.classList.add('text-blue-700');
+                    
+                    // タイマーが動作中の場合のみ「カウントアップ中」と表示する
+                    if (normalTimerInterval !== null) {
+                        normalTimerOvertime.textContent = '【カウントアップ中】';
+                    } else {
+                        // 停止中またはリセット直後の場合は空にする
+                        normalTimerOvertime.textContent = ''; 
+                    }
+                }
+            }
+        };
+
+        const startNormalTimer = () => {
+            if (normalTimerInterval !== null) return;
+
+            // カウントダウンモードで目標時間0の場合はスタートさせない
+            if (isCountdownMode && targetSeconds <= 0 && remainingSeconds <= 0 && !isTimerAlerted) {
+                updateNormalTimeDisplay(0);
+                return;
+            }
+
+            // 設定ドロップダウンを無効化
+            [setHourSelect, setMinSelect, setSecSelect].forEach(select => select.disabled = true);
+            normalStartBtn.disabled = true;
+            normalStopBtn.disabled = false;
+            normalResetBtn.disabled = false;
+            
+            normalTimerInterval = setInterval(() => {
+                if (isCountdownMode) {
+                    remainingSeconds--;
+                    
+                    if (remainingSeconds < 0 && !isTimerAlerted) {
+                        // カウントダウン：0秒になった瞬間にビープ音 5回
+                        isTimerAlerted = true;
+                        createBeep(5, 200, 880);
+                    }
+                } else {
+                    // カウントアップモード
+                    remainingSeconds++;
+                    
+                    if (targetSeconds > 0 && remainingSeconds === targetSeconds && !isTimerAlerted) {
+                         // カウントアップ：目標時間に達した瞬間にビープ音 5回
+                         isTimerAlerted = true;
+                         createBeep(5, 200, 880);
+                    }
+                }
+
+                updateNormalTimeDisplay(remainingSeconds);
+            }, 1000);
+        };
+
+        const stopNormalTimer = () => {
+            if (normalTimerInterval !== null) {
+                clearInterval(normalTimerInterval);
+                normalTimerInterval = null;
+                normalStartBtn.disabled = false;
+                normalStopBtn.disabled = true;
+                normalResetBtn.disabled = false; 
+                // 停止状態になったので表示を更新
+                updateNormalTimeDisplay(remainingSeconds);
+            }
+        };
+
+        const resetNormalTimer = () => {
+            stopNormalTimer();
+            isTimerAlerted = false;
+
+            updateTargetSeconds(); // 目標時間から残り時間/経過時間を再設定
+            
+            if (!isCountdownMode) {
+                 remainingSeconds = 0; // カウントアップは常に0から
+            }
+
+            updateNormalTimeDisplay(remainingSeconds);
+
+            // 設定ドロップダウンの制御
+            [setHourSelect, setMinSelect, setSecSelect].forEach(select => select.disabled = false); // どちらのモードでも設定可能
+            
+            // カウントダウンモードで目標時間0の場合は開始不可
+            normalStartBtn.disabled = isCountdownMode && targetSeconds <= 0; 
+            normalStopBtn.disabled = true;
+            normalResetBtn.disabled = true;
+        };
+
+        // モード切り替えロジック
+        const switchNormalMode = (isNewCountdownMode) => {
+            if (isCountdownMode === isNewCountdownMode) return;
+            
+            isCountdownMode = isNewCountdownMode;
+            
+            // UIの切り替え
+            if (isCountdownMode) {
+                // カウントダウンモードへ
+                countdownModeBtn.classList.add('bg-indigo-600', 'text-white');
+                countdownModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                countupModeBtn.classList.remove('bg-indigo-600', 'text-white');
+                countupModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                
+            } else {
+                // カウントアップモードへ
+                countupModeBtn.classList.add('bg-indigo-600', 'text-white');
+                countupModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                countdownModeBtn.classList.remove('bg-indigo-600', 'text-white');
+                countdownModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            }
+
+            // モードを切り替えたらリセット
+            resetNormalTimer();
+        };
+
+        // 初期状態でのボタン制御
+        const checkInitialNormalStart = () => {
+             updateTargetSeconds(); 
+             if(isCountdownMode) {
+                // カウントダウンは目標時間 > 0 でないと開始できない
+                normalStartBtn.disabled = targetSeconds <= 0;
+             } else {
+                // カウントアップは常に開始可能 (0から始まるため)
+                normalStartBtn.disabled = false;
+             }
+        };
+
+
+        // イベントリスナー
+        normalStartBtn.addEventListener('click', startNormalTimer);
+        normalStopBtn.addEventListener('click', stopNormalTimer);
+        normalResetBtn.addEventListener('click', resetNormalTimer);
+        countdownModeBtn.addEventListener('click', () => switchNormalMode(true));
+        countupModeBtn.addEventListener('click', () => switchNormalMode(false));
+        
+        // 初期モード設定
+        switchNormalMode(true);
+
+
+        // --- 2. 計算技術検定タイマーロジック (前回修正済み) ---
+        let examTimerInterval = null;
+        let examTotalSeconds = 0;
+        // 0: Ready, 1: Exam1, 2: Break1, 3: Exam2, 4: Break2, 5: Exam3, 6: Finished
+        let examPhase = 0; 
+        
+        // 試験: 10分 = 600秒, 休憩: 1分 = 60秒
+        const EXAM_DURATIONS = [0, 600, 60, 600, 60, 600];
+        const EXAM_PHASE_NAMES = ["準備完了", "試験 1 回目 (10:00)", "休憩 1 回目 (01:00)", "試験 2 回目 (10:00)", "休憩 2 回目 (01:00)", "試験 3 回目 (10:00)", "全行程終了"];
+        
+        const examTimerDisplay = document.getElementById('examTimerDisplay');
+        const examPhaseDisplay = document.getElementById('examPhaseDisplay');
+        const examStartBtn = document.getElementById('examStartBtn');
+        const examStopBtn = document.getElementById('examStopBtn');
+        const examResetBtn = document.getElementById('examResetBtn');
+
+        const formatExamTime = (totalSeconds) => {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+
+        const updateExamDisplay = (seconds, phase) => {
+            examTimerDisplay.textContent = formatExamTime(seconds);
+            examPhaseDisplay.textContent = EXAM_PHASE_NAMES[phase];
+            
+            const colorClass = phase % 2 === 1 ? 'text-red-600' : 'text-green-600'; // 試験中は赤、休憩中は緑
+            examPhaseDisplay.className = `text-2xl font-medium text-center ${phase === 0 || phase === 6 ? 'text-purple-600' : colorClass} h-8 mb-6`;
+        };
+        
+        const startExamTimer = () => {
+            if (examTimerInterval !== null || examPhase === 6) return;
+
+            // 1. フェーズ移行処理
+            let isStartingExamPhase = false;
+            
+            if (examPhase === 0) { // 準備完了 -> 試験1
+                examPhase = 1;
+                isStartingExamPhase = true;
+            } else if (examPhase === 2) { // 休憩1 -> 試験2
+                examPhase = 3;
+                isStartingExamPhase = true;
+            } else if (examPhase === 4) { // 休憩2 -> 試験3
+                examPhase = 5;
+                isStartingExamPhase = true;
+            } else {
+                // 休憩フェーズへの移行 (試験1 -> 休憩1, 試験2 -> 休憩2)
+                examPhase++;
+            }
+
+            examTotalSeconds = EXAM_DURATIONS[examPhase];
+            updateExamDisplay(examTotalSeconds, examPhase);
+            
+            // 2. 試験開始時の2回ビープ音 (Phase 1, 3, 5 の開始時)
+            if (isStartingExamPhase) {
+                // 周波数を高くして目立つように
+                createBeep(2, 400, 880); 
+            }
+
+            examStartBtn.disabled = true;
+            examStopBtn.disabled = false;
+            examResetBtn.disabled = true; 
+            
+            examTimerInterval = setInterval(() => {
+                examTotalSeconds--;
+                updateExamDisplay(examTotalSeconds, examPhase);
+
+                if (examTotalSeconds <= 0) {
+                    // フェーズ終了
+                    clearInterval(examTimerInterval);
+                    examTimerInterval = null;
+                    
+                    const currentPhase = examPhase;
+                    
+                    // 3. 試験終了時の5回ビープ音 (Phase 1, 3, 5 の終了時)
+                    if (currentPhase === 1 || currentPhase === 3 || currentPhase === 5) {
+                        // 周波数を低くして終了を知らせる
+                        createBeep(5, 300, 600); 
+                    }
+                    
+                    if (currentPhase < 5) {
+                         // 次のフェーズが残っている場合は自動で開始
+                         // ビープ音(5回)が鳴り終わるのを待つためにディレイを設ける
+                         const nextPhaseDelay = (currentPhase === 1 || currentPhase === 3 || currentPhase === 5) ? 2200 : 500;
+                         setTimeout(startExamTimer, nextPhaseDelay); 
+                    } else {
+                        // 全てのフェーズが終了 (Phase 5が終了し、Phase 6へ)
+                        examPhase = 6;
+                        examTotalSeconds = 0;
+                        updateExamDisplay(0, examPhase);
+                        
+                        examStartBtn.disabled = true;
+                        examStopBtn.disabled = true;
+                        examResetBtn.disabled = false;
+                    }
+                }
+            }, 1000);
+        };
+
+        const stopExamTimer = () => {
+            if (examTimerInterval !== null) {
+                clearInterval(examTimerInterval);
+                examTimerInterval = null;
+                examStartBtn.disabled = false;
+                examStopBtn.disabled = true;
+                examResetBtn.disabled = false; // 停止時はリセット可能
+            }
+        };
+
+        const resetExamTimer = () => {
+            stopExamTimer();
+            examPhase = 0;
+            examTotalSeconds = 0;
+            updateExamDisplay(0, examPhase);
+            examStartBtn.disabled = false;
+            examStopBtn.disabled = true;
+            examResetBtn.disabled = true;
+        };
+
+        // イベントリスナー
+        examStartBtn.addEventListener('click', startExamTimer);
+        examStopBtn.addEventListener('click', stopExamTimer);
+        examResetBtn.addEventListener('click', resetExamTimer);
+        
+        // 初期リセット
+        resetExamTimer();
+
+
+        // --- 3. ストップウォッチロジック ---
+        let stopwatchInterval = null;
+        let elapsedMilliseconds = 0;
+        let lastTime = 0; // requestAnimationFrameの差分計算に使用する前回のタイムスタンプ
+        let lapCount = 0;
+
+        const stopwatchDisplay = document.getElementById('stopwatchDisplay');
+        const stopwatchStartBtn = document.getElementById('stopwatchStartBtn');
+        const stopwatchStopBtn = document.getElementById('stopwatchStopBtn');
+        const stopwatchResetBtn = document.getElementById('stopwatchResetBtn');
+        const stopwatchLapBtn = document.getElementById('stopwatchLapBtn');
+        const lapTimesContainer = document.getElementById('lapTimes');
+
+        const formatStopwatchTime = (ms) => {
+            // 経過時間 (ミリ秒) が負の場合を考慮して、0を下限とする
+            const safeMs = Math.max(0, ms); 
+            const totalSeconds = Math.floor(safeMs / 1000);
+            const cs = Math.floor((safeMs % 1000) / 10); // 1/100秒
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            // 表示は常に正の値
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+        };
+
+        const updateStopwatchDisplay = () => {
+            stopwatchDisplay.textContent = formatStopwatchTime(elapsedMilliseconds);
+        };
+        
+        const step = (timestamp) => {
+            if (!stopwatchInterval) return; // 停止状態であれば何もしない
+
+            if (lastTime) {
+                const delta = timestamp - lastTime;
+                elapsedMilliseconds += delta;
+            }
+            lastTime = timestamp;
+
+            updateStopwatchDisplay();
+
+            // requestAnimationFrame を再帰的に呼び出す
+            stopwatchInterval = requestAnimationFrame(step);
+        };
+
+        const startStopwatch = () => {
+            if (stopwatchInterval === null) {
+                // 初回または再開時
+                lastTime = performance.now(); // 現在の時刻で lastTime をリセット
+                stopwatchInterval = requestAnimationFrame(step);
+                stopwatchStartBtn.disabled = true;
+                stopwatchStopBtn.disabled = false;
+                stopwatchLapBtn.disabled = false;
+                stopwatchResetBtn.disabled = true; // 停止するまでリセット不可
+            }
+        };
+
+        const stopStopwatch = () => {
+            if (stopwatchInterval !== null) {
+                cancelAnimationFrame(stopwatchInterval);
+                stopwatchInterval = null;
+                stopwatchStartBtn.disabled = false;
+                stopwatchStopBtn.disabled = true;
+                stopwatchLapBtn.disabled = true;
+                stopwatchResetBtn.disabled = false;
+            }
+        };
+
+        const resetStopwatch = () => {
+            stopStopwatch();
+            elapsedMilliseconds = 0;
+            lapCount = 0;
+            updateStopwatchDisplay();
+            
+            // ラップタイムをクリア
+            lapTimesContainer.innerHTML = '<p class="text-center text-gray-500 text-sm">ラップタイムはここに表示されます。</p>';
+
+            stopwatchStartBtn.disabled = false;
+            stopwatchResetBtn.disabled = true;
+        };
+
+        const recordLap = () => {
+            if (stopwatchInterval === null) return;
+            
+            lapCount++;
+            const lapTime = formatStopwatchTime(elapsedMilliseconds);
+            
+            const lapElement = document.createElement('div');
+            lapElement.className = 'flex justify-between items-center py-1 border-b border-gray-100 last:border-b-0';
+            lapElement.innerHTML = `
+                <span class="font-semibold text-gray-800">ラップ ${lapCount}</span>
+                <span class="font-mono text-lg text-blue-600">${lapTime}</span>
+            `;
+
+            // 最新のラップタイムを先頭に追加
+            if (lapTimesContainer.firstElementChild && lapTimesContainer.firstElementChild.tagName === 'P') {
+                lapTimesContainer.innerHTML = ''; // 初期メッセージを削除
+            }
+            lapTimesContainer.prepend(lapElement);
+        };
+
+        // イベントリスナー
+        stopwatchStartBtn.addEventListener('click', startStopwatch);
+        stopwatchStopBtn.addEventListener('click', stopStopwatch);
+        stopwatchResetBtn.addEventListener('click', resetStopwatch);
+        stopwatchLapBtn.addEventListener('click', recordLap);
+
+    </script>
+</body>
+</html>
